@@ -1,0 +1,38 @@
+ssm-GetPutTag-ServiceStageParams:
+  PolicyName: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-policy-${self:custom.moduleName}-get-SSM-parameters
+  PolicyDocument:
+    Version: '2012-10-17'
+    Statement:
+      - Effect: Allow
+        Action:
+          - ssm:GetParameters
+          - ssm:GetParameter
+          - ssm:PutParameter
+          - ssm:AddTagsToResource
+        Resource: 'arn:aws:ssm:${self:provider.region}:${aws:accountId}:parameter/${self:custom.projectName}/${self:provider.stage}/*'
+
+snsPublish:
+  PolicyName: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-policy-${self:custom.moduleName}-sns-publish
+  PolicyDocument:
+    Version: '2012-10-17'
+    Statement:
+      - Effect: Allow
+        Action:
+          - sns:Publish
+        Resource: ${self:custom.variables.emailSnsTopicArn}
+
+uploadFileS3Policy:
+  PolicyName: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-policy-${self:custom.moduleName}-upload-file-S3
+  PolicyDocument:
+    Version: '2012-10-17'
+    Statement:
+      - Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:ListBucket
+          - s3:PutObjectTagging
+          - s3:DeleteObject
+        Resource: 
+          - ${self:custom.variable.uploadFileArn}/*
+          - ${self:custom.variable.uploadFileArn}

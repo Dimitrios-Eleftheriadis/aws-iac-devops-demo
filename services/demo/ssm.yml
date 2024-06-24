@@ -1,0 +1,3 @@
+deploymentBucket: ${ssm:/${self:custom.projectName}/${self:provider.stage}/serverless_deployment_bucket}
+emailSnsTopicArn : ${ssm:/${self:custom.projectName}/${self:provider.stage}/email_topic_arn}
+accountId: ${ssm:/${self:custom.projectName}/${self:provider.stage}/account_id}

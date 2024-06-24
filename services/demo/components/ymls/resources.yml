@@ -1,0 +1,11 @@
+Resources:
+  mainFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-role-${self:custom.moduleName}-main-function
+      AssumeRolePolicyDocument: ${self:custom.trustPolicy.assumeRolePolicyDocument}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - ${file(./components/ymls/policies.yml):ssm-GetPutTag-ServiceStageParams}
+        - ${file(./components/ymls/policies.yml):snsPublish}

@@ -1,0 +1,41 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: dimitrisele
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: demo-app
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-${self:custom.moduleName}
+
+plugins:
+  - serverless-offline
+
+frameworkVersion: '3'
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'default'}
+  region: ${self:custom.region}
+  stackName: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-cfstack-${self:custom.moduleName}
+  stackPolicy:
+    - Effect: Allow
+      Action: "Update:*"
+      Principal: "*"
+      Resource: "*"
+  deploymentPrefix: serverless
+  deploymentBucket:
+    name: ${self:custom.variables.deploymentBucket}
+    blockPublicAccess: true
+  
+  
+functions:
+  demoFunction: ${file(./components/ymls/functions.yml):demoFunction}
+
+resources:
+  - ${file(./components/ymls/resources.yml)}
+
+custom:
+  region: ${file(./config.json):region}
+  regionLabel: ${file(./config.json):region_label}
+  projectName: ${file(./config.json):project_name}
+  moduleName: ${file(./config.json):module_name}
+  trustPolicy: ${file(./assumeRolePolicyDocument.yml)}
+  variables: ${file(./ssm.yml)}

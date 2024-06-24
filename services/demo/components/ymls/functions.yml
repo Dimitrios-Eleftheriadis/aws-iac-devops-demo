@@ -1,0 +1,8 @@
+demoFunction:
+  timeout: 300
+  name: ${self:custom.projectName}-${self:custom.regionLabel}-app-${self:provider.stage}-lambda-${self:custom.moduleName}-demoFunction
+  role: mainFunctionRole
+  environment: ${file(components/ymls/env.yml):mainFunction}
+  handler: components/functions/demoFunction/index.handler
+  events:
+    - httpApi: 'POST /'

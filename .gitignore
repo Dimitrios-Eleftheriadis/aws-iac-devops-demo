@@ -1,0 +1,4 @@
+# Environmental variables file
+.env
+
+stack_status.txt

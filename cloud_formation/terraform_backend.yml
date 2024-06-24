@@ -1,0 +1,281 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+##
+Description: >
+  Provision Terraform backend. We want an S3 for the state file and a DynamoDB table for the lock file.
+
+## 
+Parameters:
+  
+  ProjectName:
+    Description: Name of the project.
+    Type: String
+    Default: "demo-project"
+
+  RegionLabel:
+    Description: A custom label for the region.
+    Type: String
+    Default: "eu1"
+
+  AppName:
+    Description: Name of the app.
+    Type: String
+    Default: "app"
+
+  EnvLabel:
+    Description: Lable for the environment. A dash mean cross-environment.
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - prod
+
+  Owner:
+    Description: The owner entity's name.
+    Type: String
+    Default: "Dimitrios Eleftheriadis"
+  
+  IaCTag:
+    Description: A tag to identify resources created using the IaC approach.
+    Type: String 
+    Default: "true"
+
+  ProvisionedBy:
+    Description: Provisioned by.
+    Type: String
+    Default: "CloudFormation template"
+
+  StateBucketNameSuffix:
+    Description: Suffix for the name of the S3 bucket used to hold the Terraform state file.
+    Type: String
+    Default: "backend-tf-states-de"
+
+  LockTableNameSuffix:
+    Description: Sufic for the name of the DynamoDB table used to store the Terraform state lock.
+    Type: String
+    Default: "backend-tf-lock-de"
+
+  TerraformBackendRoleNameSuffix:
+    Description: Suffix for the name of the IAM role that must be used to operate the remote Terraform state.
+    Type: String
+    Default: "terraform-backend"
+  
+  AccId:
+    Description: The account id for the dev account.
+    Type: String
+
+
+  # TstAccId:
+  #   Description: The account id for the test account.
+  #   Type: String
+
+
+  # PrdAccId:
+  #   Description: The account id for the prod account.
+  #   Type: String
+
+
+
+##
+Resources:
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+            BucketKeyEnabled: true
+      BucketName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - s3
+          - !Ref StateBucketNameSuffix
+      Tags:
+        - Key: "Owner"
+          Value: !Ref Owner
+        - Key: "IaC"
+          Value: !Ref IaCTag
+        - Key: "ProvisionedBy"
+          Value: !Ref ProvisionedBy
+        - Key: "Type"
+          Value: "S3 Bucket"
+      VersioningConfiguration:
+        Status: Enabled 
+
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification: 
+        SSEEnabled: true
+        SSEType: KMS
+      TableName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - dynamo
+          - !Ref LockTableNameSuffix
+      Tags:
+          - Key: "Owner"
+            Value: !Ref Owner
+          - Key: "IaC"
+            Value: !Ref IaCTag
+          - Key: "ProvisionedBy"
+            Value: !Ref ProvisionedBy
+          - Key: "Type"
+            Value: "DynamoDB Table"
+
+  TerraformBackendRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - iam-role
+          - !Ref TerraformBackendRoleNameSuffix
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: 
+              AWS:
+                - !Ref AccId
+            Action:
+              - 'sts:AssumeRole'
+      Tags:
+          - Key: "Owner"
+            Value: !Ref Owner
+          - Key: "IaC"
+            Value: !Ref IaCTag
+          - Key: "ProvisionedBy"
+            Value: !Ref ProvisionedBy
+          - Key: "Type"
+            Value: "IAM Role"
+
+
+  TerraformStateBucketListRolePolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - iam-policy
+          - terraform-state-bucket-list
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt TerraformStateBucket.Arn
+      RoleName: !Ref TerraformBackendRole
+
+  TerraformStateBucketCRUDRolePolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - iam-policy
+          - terraform-state-bucket-crud
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
+              - 's3:DeleteObject'
+            Resource: !Join
+              - ''
+              - - !GetAtt TerraformStateBucket.Arn
+                - !Sub '/environments/${EnvLabel}/*'
+      RoleName: !Ref TerraformBackendRole
+
+  TerraformLockTableRolePolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - iam-policy
+          - terraform-lock-table
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+            Resource: !GetAtt TerraformLockTable.Arn
+      RoleName: !Ref TerraformBackendRole
+
+
+  CustomExecutionPolicy:
+    Type: 'AWS::IAM::RolePolicy'
+    Properties:
+      PolicyName: !Join
+        - '-'
+        - - !Ref ProjectName
+          - !Ref RegionLabel
+          - !Ref AppName
+          - !Ref EnvLabel
+          - iam-policy
+          - custom-execution
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sns:*'
+              - 'ssm:*'
+              - 's3:*'
+            Resource: "*"
+      RoleName: !Ref TerraformBackendRole
+
+
+
+
+
+## 
+Outputs:
+  TerraformStateBucketName:
+    Description: The name of the S3 bucket containing the Terraform backend state
+    Value: !Ref TerraformStateBucket
+
+  TerraformLockTableName:
+    Description: The name of the DynamoDB table used by Terraform to handle the lock file
+    Value: !Select [1, !Split ['/', !GetAtt TerraformLockTable.Arn]]
+
+  TerraformBackendRoleArn:
+    Description: The ARN of the IAM Role with permissions required for the Terraform backend
+    Value: !GetAtt TerraformBackendRole.Arn
